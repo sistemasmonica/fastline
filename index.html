@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fast Line — Control de Vehículos</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://alcdn.msauth.net/browser/2.38.1/js/msal-browser.min.js"></script>
+<style>
+:root {
+  --bg: #f5f4f0;
+  --surface: #ffffff;
+  --surface2: #f0ede8;
+  --border: #e0dbd3;
+  --text: #1a1916;
+  --muted: #6b6860;
+  --accent: #1a3a5c;
+  --accent2: #2e6da4;
+  --green: #1e6b3c;
+  --green-bg: #e8f5ee;
+  --red: #8b2020;
+  --red-bg: #fdeaea;
+  --amber: #7a4f0d;
+  --amber-bg: #fef3dc;
+  --blue-bg: #e8f0fa;
+  --radius: 10px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); font-size: 14px; min-height: 100vh; }
+
+/* HEADER */
+.header { background: var(--accent); color: white; padding: 0 2rem; display: flex; align-items: center; justify-content: space-between; height: 56px; position: sticky; top: 0; z-index: 100; }
+.header-logo { font-size: 16px; font-weight: 600; letter-spacing: -0.3px; display: flex; align-items: center; gap: 10px; }
+.logo-badge { background: #2e6da4; border-radius: 6px; padding: 4px 8px; font-size: 11px; font-weight: 500; letter-spacing: 0.5px; }
+.header-info { font-size: 12px; color: rgba(255,255,255,0.6); font-family: 'DM Mono', monospace; }
+
+/* NAV TABS */
+.nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 2rem; display: flex; gap: 0; overflow-x: auto; }
+.nav-tab { padding: 14px 20px; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--muted); border-bottom: 2px solid transparent; white-space: nowrap; transition: color 0.15s, border-color 0.15s; display: flex; align-items: center; gap: 7px; }
+.nav-tab:hover { color: var(--text); }
+.nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.nav-icon { font-size: 15px; }
+
+/* LAYOUT */
+.page { display: none; padding: 2rem; max-width: 1200px; margin: 0 auto; }
+.page.active { display: block; }
+
+/* CARDS */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; margin-bottom: 1.25rem; box-shadow: var(--shadow); }
+.card-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 1rem; display: flex; align-items: center; gap: 8px; }
+
+/* GRID */
+.grid-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 1.25rem; }
+.metric { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.25rem; }
+.metric-label { font-size: 11px; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+.metric-val { font-size: 24px; font-weight: 600; line-height: 1; }
+.metric-val.green { color: var(--green); }
+.metric-val.red { color: var(--red); }
+.metric-val.blue { color: var(--accent2); }
+.metric-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+/* FORMS */
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 1rem; }
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
+input, select, textarea { font-family: 'DM Sans', sans-serif; font-size: 13px; padding: 8px 11px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--text); outline: none; transition: border-color 0.15s; width: 100%; }
+input:focus, select:focus, textarea:focus { border-color: var(--accent2); }
+textarea { min-height: 140px; resize: vertical; font-family: 'DM Mono', monospace; font-size: 12px; line-height: 1.6; }
+
+/* BUTTONS */
+.btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 18px; border-radius: 7px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; font-family: 'DM Sans', sans-serif; transition: opacity 0.15s, transform 0.1s; }
+.btn:active { transform: scale(0.98); }
+.btn-primary { background: var(--accent); color: white; }
+.btn-primary:hover { background: #152f4a; }
+.btn-success { background: var(--green); color: white; }
+.btn-success:hover { opacity: 0.9; }
+.btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
+.btn-outline:hover { background: var(--surface2); }
+.btn-sm { padding: 5px 11px; font-size: 12px; border-radius: 6px; }
+.btn-danger-sm { background: transparent; border: 1px solid var(--border); color: var(--muted); border-radius: 6px; padding: 4px 9px; font-size: 11px; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+.btn-danger-sm:hover { border-color: var(--red); color: var(--red); }
+.btn-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+/* TABLES */
+.table-wrap { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); }
+table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+thead { background: var(--surface2); }
+th { padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap; border-bottom: 1px solid var(--border); }
+td { padding: 9px 12px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: middle; }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover td { background: var(--surface2); }
+
+/* TAGS */
+.tag { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+.tag-green { background: var(--green-bg); color: var(--green); }
+.tag-blue { background: var(--blue-bg); color: var(--accent); }
+.tag-amber { background: var(--amber-bg); color: var(--amber); }
+.tag-red { background: var(--red-bg); color: var(--red); }
+.tag-gray { background: var(--surface2); color: var(--muted); }
+
+/* ALERTS */
+.alert { padding: 11px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; display: flex; align-items: flex-start; gap: 8px; }
+.alert-success { background: var(--green-bg); color: var(--green); border: 1px solid #b8dfc8; }
+.alert-error { background: var(--red-bg); color: var(--red); border: 1px solid #f0b8b8; }
+.alert-info { background: var(--blue-bg); color: var(--accent); border: 1px solid #b8cfe8; }
+.hint { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+
+/* SECTION */
+.section-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 1rem; }
+.empty-state { text-align: center; padding: 3rem 1rem; color: var(--muted); font-size: 13px; }
+
+/* RESUMEN */
+.resumen-filtros { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 1.25rem; }
+.resumen-filtros select { width: auto; }
+
+/* PLACA BADGE */
+.placa { font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 500; background: var(--blue-bg); color: var(--accent); padding: 2px 8px; border-radius: 5px; border: 1px solid #c0d4ec; }
+
+/* SCROLLBAR */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--surface2); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* PRINT */
+@media print {
+  body { background: white; font-size: 11px; }
+  .header { position: static !important; background: #1a3a5c !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; padding: 10px 16px; height: auto; }
+  .nav, .btn-row, .btn, button, .btn-danger-sm, .resumen-filtros, .toast-container, #preview-section { display: none !important; }
+  .page { display: block !important; padding: 0.5rem 0; }
+  .page:not(.active) { display: none !important; }
+  .card { box-shadow: none; border: 1px solid #ddd; margin-bottom: 0.75rem; break-inside: avoid; }
+  .table-wrap { overflow: visible; }
+  .grid-metrics { grid-template-columns: repeat(3, 1fr); }
+  .veh-grid { grid-template-columns: 1fr 1fr; }
+}
+
+/* TOAST */
+.toast-container { position: fixed; bottom: 1.5rem; right: 1.5rem; display: flex; flex-direction: column; gap: 8px; z-index: 9999; }
+.toast { background: var(--text); color: white; padding: 11px 16px; border-radius: 8px; font-size: 13px; animation: slideIn 0.2s ease; max-width: 320px; }
+.toast.green { background: var(--green); }
+.toast.red { background: var(--red); }
+@keyframes slideIn { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+/* STATS V1 V2 */
+.veh-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+@media(max-width: 600px) { .veh-grid { grid-template-columns: 1fr; } }
+.veh-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; }
+.veh-title { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+.stat-row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.stat-row:last-child { border-bottom: none; font-weight: 600; }
+.stat-label { color: var(--muted); }
+</style>
+</head>
+<body>
+
+<div class="toast-container" id="toasts"></div>
+
+<div class="header">
+  <div class="header-logo" style="gap:0">
+    <div style="display:flex;flex-direction:column;line-height:1;user-select:none">
+      <div style="font-size:24px;font-weight:900;letter-spacing:-1px;font-family:'DM Sans',sans-serif;">
+        <span style="color:#d0dce8;">FAST</span><span style="color:#e02020;">LINE</span>
+      </div>
+      <div style="font-size:9px;font-weight:700;letter-spacing:3px;color:#7a9bbf;margin-top:2px;">DM RIOS &nbsp;·&nbsp; CONTROL DE VEHÍCULOS</div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <div class="header-info" id="header-date"></div>
+    <div id="file-status" title="Estado de sincronización con la nube" style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:6px;padding:5px 10px;font-size:11px;color:rgba(255,255,255,0.7);white-space:nowrap;">
+      <span id="file-dot" style="width:7px;height:7px;border-radius:50%;background:#f59e0b;flex-shrink:0"></span>
+      <span id="file-label">Conectando...</span>
+    </div>
+    <button onclick="exportarDatos()" style="background:#1e6b3c;color:white;border:none;border-radius:6px;padding:6px 14px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:500;">&#x2B07; Backup</button>
+    <button onclick="window.print()" style="background:#2e6da4;color:white;border:none;border-radius:6px;padding:6px 14px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:500;">&#x1F5A8; Imprimir</button>
+  </div>
+</div>
+
+<div class="nav">
+  <div class="nav-tab active" onclick="showTab('correos')">
+    <span class="nav-icon">📧</span> Importar correos
+  </div>
+  <div class="nav-tab" onclick="showTab('registro')">
+    <span class="nav-icon">📝</span> Registro manual
+  </div>
+  <div class="nav-tab" onclick="showTab('gastos')">
+    <span class="nav-icon">💸</span> Gastos
+  </div>
+  <div class="nav-tab" onclick="showTab('resumen')">
+    <span class="nav-icon">📊</span> Resumen
+  </div>
+  <div class="nav-tab" onclick="showTab('historial')">
+    <span class="nav-icon">🗂️</span> Historial
+  </div>
+</div>
+
+<!-- ===== TAB: IMPORTAR CORREOS ===== -->
+<div id="page-correos" class="page active">
+
+  <!-- CONEXIÓN AUTOMÁTICA HOTMAIL -->
+  <div class="card" style="border-color:#0078d4;border-width:2px;background:#f0f6ff;margin-bottom:16px">
+    <div class="card-title" style="color:#0078d4">
+      <span style="font-size:18px">🔗</span> Conexión automática con Hotmail
+    </div>
+    <p style="font-size:13px;color:#1a3a5c;margin-bottom:14px;line-height:1.6">
+      Conecte su cuenta de Hotmail y FastLine importará <b>todos los correos de fin de viaje automáticamente</b> — sin copiar ni pegar.
+    </p>
+    <div id="hm-estado" style="font-size:13px;margin-bottom:12px;padding:8px 12px;border-radius:8px;background:#fff;border:1px solid #cce0ff;color:#1a3a5c">
+      ⬜ No conectado
+    </div>
+    <div id="hm-btns">
+      <button class="btn btn-primary" style="background:#0078d4;font-size:14px;padding:10px 22px" onclick="conectarHotmail()">🔗 Conectar con Hotmail</button>
+    </div>
+  </div>
+
+  <div style="text-align:center;color:var(--muted);font-size:12px;margin:0 0 12px;letter-spacing:1px">― o use el método manual ―</div>
+
+  <!-- MARCADOR HOTMAIL -->
+  <div class="card" style="border-color:#0078d4;border-width:1.5px">
+    <div class="card-title" style="color:#0078d4">
+      <span style="font-size:18px">📨</span> Importar correos de Hotmail más rápido
+    </div>
+    <p style="font-size:13px;color:#6b6860;margin-bottom:12px;line-height:1.6">
+      Instale el <b>marcador de un solo clic</b> en su navegador. Así solo hace clic una vez por correo en vez de seleccionar y copiar manualmente.
+    </p>
+    <div class="btn-row">
+      <button class="btn btn-primary" style="background:#0078d4" onclick="window.open('marcador.html','_blank')">
+        ⚙️ Ver instrucciones para instalar el marcador
+      </button>
+    </div>
+  </div>
+
+  <div style="text-align:center;color:var(--muted);font-size:12px;margin:-4px 0 12px;letter-spacing:1px">― o pegue manualmente ―</div>
+
+  <div class="card">
+    <div class="card-title">📧 Pegar correos de fin de viaje</div>
+    <div style="background:#e8f0fa;border:1px solid #b8cfe8;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#1a3a5c">
+      <b>💡 Proceso rápido con el marcador:</b> Abra un correo en Hotmail → clic en el favorito <b>"📧 Copiar correo FastLine"</b> → vuelva aquí y haga clic en <b>"📋 Pegar correo"</b>. Repita para cada correo y al final haga clic en "Extraer carreras".
+    </div>
+    <div class="btn-row" style="margin-bottom:12px">
+      <button class="btn btn-success" onclick="pegarCorreoPortapapeles()">📋 Pegar correo</button>
+      <button class="btn btn-outline" onclick="document.getElementById('correo-input').value=''">✕ Limpiar</button>
+    </div>
+    <label class="field">
+      <span style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:5px;display:block">Texto del correo (puedes pegar varios correos juntos)</span>
+      <textarea id="correo-input" placeholder="Información de fin de viaje con voucher.
+EMPRESA EUROFARMA S.A.
+USUARIO KAREN ESTEFANIA ORTEGA CEVALLOS
+TARIFA $ 7.43 SERVICIO MOVILIZACION
+VOUCHER ELECTRÓNICO 906
+AUTORIZACIÓN 5334834
+FECHA DE SOLICITUD DEL SERVICIO 2026-05-22
+ORIGEN HORA: 17:04 C CUMBAYA
+DESTINO HORA: 17:39 Telefónica, Leonardo Tejada...
+KM RECORRIDO 14.66
+UNIDAD T954
+CONDUCTOR CAGUA MARCILLO EDISON ADAN
+PLACA PFN3446"></textarea>
+    </label>
+    <p class="hint">💡 Copia el texto del correo que te llega (Ctrl+A, Ctrl+C) y pégalo aquí (Ctrl+V). Puedes pegar varios correos juntos.</p>
+    <div class="btn-row" style="margin-top:12px">
+      <button class="btn btn-primary" onclick="parsearCorreos()">⚡ Extraer carreras</button>
+      <button class="btn btn-outline" onclick="document.getElementById('correo-input').value=''">✕ Limpiar</button>
+    </div>
+  </div>
+
+  <div id="preview-section" style="display:none">
+    <div class="section-header">
+      <div class="card-title" style="margin:0">✅ Carreras detectadas — revisa y confirma</div>
+      <div class="btn-row">
+        <button class="btn btn-success" onclick="confirmarCarreras()">💾 Guardar todas</button>
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('preview-section').style.display='none'">Cancelar</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>#</th><th>Fecha</th><th>Placa</th><th>Conductor</th><th>Empresa / Usuario</th>
+          <th>Origen → Destino</th><th>Km</th><th>Tarifa</th><th>Tipo</th><th>Voucher</th>
+        </tr></thead>
+        <tbody id="preview-body"></tbody>
+      </table>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-success" onclick="confirmarCarreras()">💾 Guardar todas en el registro</button>
+      <button class="btn btn-outline" onclick="exportarPreviewCSV()">📥 Solo exportar CSV</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TAB: REGISTRO MANUAL ===== -->
+<div id="page-registro" class="page">
+  <div class="card">
+    <div class="card-title">📝 Registrar día manualmente</div>
+    <div class="form-grid">
+      <div class="field"><label>Fecha</label><input type="date" id="r-fecha"></div>
+      <div class="field"><label>Vehículo</label>
+        <select id="r-placa">
+          <option value="">Seleccionar...</option>
+          <option value="V1 - PFN3446">V1 — PFN3446</option>
+          <option value="V2 - (Placa B)">V2 — (Placa B)</option>
+        </select>
+      </div>
+      <div class="field"><label>Conductor</label><input type="text" id="r-conductor" placeholder="Nombre del conductor"></div>
+    </div>
+    <div class="form-grid">
+      <div class="field"><label>N° de carreras</label><input type="number" id="r-carreras" placeholder="0" min="0"></div>
+      <div class="field"><label>Km recorridos</label><input type="number" id="r-km" placeholder="0.0" step="0.1"></div>
+      <div class="field"><label>Monto total ($)</label><input type="number" id="r-monto" placeholder="0.00" step="0.01"></div>
+    </div>
+    <div class="form-grid">
+      <div class="field"><label>Tipo de cobro</label>
+        <select id="r-tipo">
+          <option value="mixto">Mixto</option>
+          <option value="efectivo">Efectivo</option>
+          <option value="bóucher">Bóucher / Voucher</option>
+          <option value="ticket">Ticket</option>
+        </select>
+      </div>
+      <div class="field"><label>Monto efectivo ($)</label><input type="number" id="r-efectivo" placeholder="0.00" step="0.01"></div>
+      <div class="field"><label>Monto bóucher/ticket ($)</label><input type="number" id="r-boucher" placeholder="0.00" step="0.01"></div>
+    </div>
+    <div class="form-grid">
+      <div class="field"><label>¿Trabajó ese día?</label>
+        <select id="r-trabajo">
+          <option value="SI">Sí trabajó</option>
+          <option value="NO">No trabajó</option>
+        </select>
+      </div>
+      <div class="field"><label>Motivo (si no trabajó)</label><input type="text" id="r-motivo" placeholder="Feriado, enfermedad..."></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="guardarRegistroManual()">💾 Guardar registro</button>
+      <button class="btn btn-outline" onclick="limpiarFormRegistro()">✕ Limpiar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TAB: GASTOS ===== -->
+<div id="page-gastos" class="page">
+  <div class="card">
+    <div class="card-title">💸 Registrar gasto</div>
+    <div class="form-grid">
+      <div class="field"><label>Fecha</label><input type="date" id="g-fecha"></div>
+      <div class="field"><label>Vehículo</label>
+        <select id="g-placa">
+          <option value="Ambos">Ambos vehículos</option>
+          <option value="V1 - PFN3446">V1 — PFN3446</option>
+          <option value="V2 - (Placa B)">V2 — (Placa B)</option>
+        </select>
+      </div>
+      <div class="field"><label>Tipo de gasto</label>
+        <select id="g-tipo">
+          <option value="Combustible">Combustible</option>
+          <option value="Mantenimiento">Mantenimiento</option>
+          <option value="Peaje">Peaje</option>
+          <option value="Multa">Multa</option>
+          <option value="Seguro">Seguro</option>
+          <option value="Otro">Otro</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="field"><label>Monto ($)</label><input type="number" id="g-monto" placeholder="0.00" step="0.01"></div>
+      <div class="field" style="grid-column:span 2"><label>Descripción</label><input type="text" id="g-desc" placeholder="Ej: Cambio de aceite, gasolina extra, peaje Guayaquil..."></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="guardarGasto()">💾 Guardar gasto</button>
+    </div>
+  </div>
+
+  <div class="section-header">
+    <div style="font-size:14px;font-weight:600">Gastos registrados</div>
+    <button class="btn btn-outline btn-sm" onclick="exportarGastosCSV()">📥 Exportar CSV</button>
+  </div>
+  <div class="table-wrap" id="tabla-gastos-wrap">
+    <div class="empty-state">No hay gastos registrados aún.</div>
+  </div>
+</div>
+
+<!-- ===== TAB: RESUMEN ===== -->
+<div id="page-resumen" class="page">
+  <div class="resumen-filtros">
+    <select id="res-periodo" onchange="renderResumen()">
+      <option value="hoy">Hoy</option>
+      <option value="semana">Esta semana</option>
+      <option value="mes" selected>Este mes</option>
+      <option value="todo">Todo el tiempo</option>
+    </select>
+    <select id="res-vehiculo" onchange="renderResumen()">
+      <option value="ambos">Ambos vehículos</option>
+      <option value="V1">Vehículo 1</option>
+      <option value="V2">Vehículo 2</option>
+    </select>
+  </div>
+
+  <div class="grid-metrics" id="cards-resumen"></div>
+
+  <div class="veh-grid" style="margin-bottom:1.25rem">
+    <div class="veh-card">
+      <div class="veh-title"><span class="placa">V1</span> Vehículo 1</div>
+      <div id="stats-v1"></div>
+    </div>
+    <div class="veh-card">
+      <div class="veh-title"><span class="placa">V2</span> Vehículo 2</div>
+      <div id="stats-v2"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📋 Carreras por empresa (período seleccionado)</div>
+    <div id="tabla-empresas"></div>
+  </div>
+</div>
+
+<!-- ===== TAB: HISTORIAL ===== -->
+<div id="page-historial" class="page">
+  <div class="section-header">
+    <div style="font-size:14px;font-weight:600">Historial completo de carreras</div>
+    <div class="btn-row">
+      <select id="h-filtro-placa" onchange="renderHistorial()" style="width:auto">
+        <option value="todos">Todos los vehículos</option>
+        <option value="V1">Vehículo 1</option>
+        <option value="V2">Vehículo 2</option>
+      </select>
+      <button class="btn btn-outline btn-sm" onclick="exportarHistorialCSV()">📥 Exportar CSV</button>
+      <button class="btn btn-outline btn-sm" onclick="limpiarTodo()" style="color:var(--red)">🗑️ Borrar todo</button>
+    </div>
+  </div>
+  <div class="table-wrap" id="tabla-historial-wrap">
+    <div class="empty-state">No hay registros aún.</div>
+  </div>
+</div>
+
+
+<script>
+// ============ SUPABASE — NUBE ============
+const SUPA_URL = 'https://pqluiqsvfeddmxpuxyhm.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxbHVpcXN2ZmVkZG14cHV4eWhtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1MTI4MDYsImV4cCI6MjA5NjA4ODgwNn0.cdWKlECRLxms1y8a3sSHr1i5rsif9B94mDrvigHNm2A';
+const sb = window.supabase.createClient(SUPA_URL, SUPA_KEY);
+
+// ============ STATE ============
+let registros = JSON.parse(localStorage.getItem('fl_registros') || '[]');
+let gastos = JSON.parse(localStorage.getItem('fl_gastos') || '[]');
+let previewCarreras = [];
+
+// ============ INIT ============
+document.getElementById('r-fecha').value = hoy();
+document.getElementById('g-fecha').value = hoy();
+document.getElementById('header-date').textContent = new Date().toLocaleDateString('es-EC', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+window.addEventListener('load', syncFromCloud);
+
+function hoy() { return new Date().toISOString().slice(0,10); }
+
+// ============ ESTADO NUBE ============
+function setCloudStatus(estado) {
+  const dot = document.getElementById('file-dot');
+  const label = document.getElementById('file-label');
+  if (estado === 'conectando') { dot.style.background = '#f59e0b'; label.textContent = 'Conectando...'; }
+  else if (estado === 'ok') { dot.style.background = '#4caf50'; label.textContent = '☁ Nube sincronizada'; }
+  else { dot.style.background = '#f44336'; label.textContent = '⚠ Sin conexión a nube'; }
+}
+
+// ============ STORAGE: SUPABASE + LOCAL ============
+function save() {
+  localStorage.setItem('fl_registros', JSON.stringify(registros));
+  localStorage.setItem('fl_gastos', JSON.stringify(gastos));
+  saveToCloud();
+}
+
+async function saveToCloud() {
+  const ts = new Date().toISOString();
+  try {
+    await Promise.all([
+      sb.from('app_data').upsert({ key: 'fl_registros', value: { data: registros }, updated_at: ts }),
+      sb.from('app_data').upsert({ key: 'fl_gastos', value: { data: gastos }, updated_at: ts })
+    ]);
+    setCloudStatus('ok');
+  } catch(e) {
+    console.warn('Error guardando en nube:', e);
+    setCloudStatus('error');
+  }
+}
+
+async function syncFromCloud() {
+  setCloudStatus('conectando');
+  try {
+    const [r1, r2] = await Promise.all([
+      sb.from('app_data').select('value').eq('key', 'fl_registros').maybeSingle(),
+      sb.from('app_data').select('value').eq('key', 'fl_gastos').maybeSingle()
+    ]);
+    if (r1.data?.value?.data) {
+      registros = r1.data.value.data;
+      localStorage.setItem('fl_registros', JSON.stringify(registros));
+    }
+    if (r2.data?.value?.data) {
+      gastos = r2.data.value.data;
+      localStorage.setItem('fl_gastos', JSON.stringify(gastos));
+    }
+    setCloudStatus('ok');
+    renderTodo();
+    toast('Datos cargados desde la nube', 'green');
+  } catch(e) {
+    console.warn('Error sincronizando:', e);
+    setCloudStatus('error');
+    renderTodo();
+    toast('Sin conexión — mostrando datos locales', '');
+  }
+}
+
+function renderTodo() {
+  renderGastos();
+  renderHistorial();
+  renderResumen();
+}
+
+function exportarDatos() {
+  const datos = { fl_registros: registros, fl_gastos: gastos };
+  const blob = new Blob([JSON.stringify(datos, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'fastline_backup_' + hoy() + '.json';
+  a.click();
+  toast('Backup descargado', 'green');
+}
+
+// ============ TABS ============
+function showTab(name) {
+  document.querySelectorAll('.nav-tab').forEach((t,i) => {
+    const names = ['correos','registro','gastos','resumen','historial'];
+    t.classList.toggle('active', names[i] === name);
+  });
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  if(name==='resumen') renderResumen();
+  if(name==='historial') renderHistorial();
+  if(name==='gastos') renderGastos();
+}
+
+// ============ TOAST ============
+function toast(msg, type='') {
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.textContent = msg;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+// ============ PARSEAR CORREOS ============
+function parsearCorreos() {
+  const texto = document.getElementById('correo-input').value.trim();
+  if(!texto) { toast('Pega el texto del correo primero', 'red'); return; }
+
+  const bloques = dividirEnBloques(texto);
+  previewCarreras = bloques.map(extraerDatos).filter(c => c && c.tarifa > 0);
+
+  if(!previewCarreras.length) { toast('No se detectaron carreras. Verifica el formato', 'red'); return; }
+
+  renderPreview();
+  document.getElementById('preview-section').style.display = 'block';
+  document.getElementById('preview-section').scrollIntoView({behavior:'smooth'});
+  toast(`${previewCarreras.length} carrera${previewCarreras.length>1?'s':''} detectada${previewCarreras.length>1?'s':''}`, 'green');
+}
+
+function dividirEnBloques(texto) {
+  let partes = texto.split(/(?=informaci[oó]n de fin de viaje)/gi).filter(s => s.trim().length > 30);
+  if(partes.length <= 1) {
+    partes = texto.split(/(?=EMPRESA\s+[A-Z])/g).filter(s => s.trim().length > 30);
+  }
+  if(partes.length <= 1) partes = [texto];
+  return partes;
+}
+
+function extraerDatos(bloque) {
+  const get = (patterns) => {
+    for(const p of patterns) {
+      const m = bloque.match(p);
+      if(m && m[1]) return m[1].trim();
+    }
+    return '';
+  };
+
+  const tarifa_raw = get([/TARIFA\s*\$?\s*([\d.,]+)/i, /VALOR\s*\$?\s*([\d.,]+)/i]);
+  const tarifa = parseFloat(tarifa_raw.replace(',','.')) || 0;
+  const km_raw = get([/KM RECORRIDO\s+([\d.,]+)/i, /KILOMETRO[S]?\s+([\d.,]+)/i]);
+  const km = parseFloat(km_raw.replace(',','.')) || 0;
+  const fecha = get([/FECHA DE SOLICITUD DEL SERVICIO\s+(\d{4}-\d{2}-\d{2})/i, /FECHA[:\s]+(\d{4}-\d{2}-\d{2})/i]) || hoy();
+  const empresa = get([/EMPRESA\s+(.+)/i]);
+  const usuario = get([/USUARIO\s+(.+)/i]);
+  const conductor = get([/CONDUCTOR\s+(.+)/i]);
+  const placa = get([/PLACA\s+(\w+)/i]);
+  const unidad = get([/UNIDAD\s+(\w+)/i]);
+  const voucher = get([/VOUCHER[^0-9\n]*([\w]+)\s*\n/i, /VOUCHER[:\s]+(\w+)/i]);
+  const autorizacion = get([/AUTORIZACI[OÓ]N\s+(\w+)/i]);
+
+  const om = bloque.match(/ORIGEN HORA:\s*([\d:]+)\s+(.+)/i);
+  const dm = bloque.match(/DESTINO HORA:\s*([\d:]+)\s+(.+)/i);
+  const origen = om ? (om[1]+' '+om[2]).trim() : get([/ORIGEN[:\s]+(.+)/i]);
+  const destino = dm ? (dm[1]+' '+dm[2]).trim() : get([/DESTINO[:\s]+(.+)/i]);
+
+  const tipo = bloque.toLowerCase().includes('voucher') || bloque.toLowerCase().includes('bóucher') ? 'bóucher' :
+               bloque.toLowerCase().includes('ticket') ? 'ticket' : 'efectivo';
+
+  const vehiculo = placa ? (placa.toUpperCase().includes('PFN3446') ? 'V1' : 'V2') : '';
+
+  return { fecha, empresa, usuario, conductor, placa, unidad, voucher, autorizacion, origen, destino, km, tarifa, tipo, vehiculo, fuente:'correo', id: Date.now()+Math.random() };
+}
+
+function renderPreview() {
+  const tbody = document.getElementById('preview-body');
+  tbody.innerHTML = previewCarreras.map((c,i) => `
+    <tr>
+      <td>${i+1}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px">${c.fecha}</td>
+      <td><span class="placa">${c.placa||'—'}</span></td>
+      <td style="white-space:nowrap">${cortar(c.conductor,18)}</td>
+      <td style="font-size:11px;color:var(--muted)">${cortar(c.empresa,16)}<br><span style="color:var(--text)">${cortar(c.usuario,16)}</span></td>
+      <td style="font-size:11px;color:var(--muted)">${cortar(c.origen,20)} → ${cortar(c.destino,20)}</td>
+      <td>${c.km.toFixed(2)}</td>
+      <td style="font-weight:600;color:var(--green)">$${c.tarifa.toFixed(2)}</td>
+      <td><span class="tag ${c.tipo==='bóucher'?'tag-blue':c.tipo==='ticket'?'tag-amber':'tag-green'}">${c.tipo}</span></td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px">${c.voucher||'—'}</td>
+    </tr>
+  `).join('');
+}
+
+function confirmarCarreras() {
+  if(!previewCarreras.length) return;
+  const vouchersExistentes = new Set(registros.map(r => r.voucher).filter(Boolean));
+  const nuevas = previewCarreras.filter(c => !c.voucher || !vouchersExistentes.has(c.voucher));
+  const duplicadas = previewCarreras.length - nuevas.length;
+  if(!nuevas.length) {
+    toast(`Todos los correos ya estaban cargados (${duplicadas} duplicados omitidos)`, 'red');
+    previewCarreras = [];
+    document.getElementById('preview-section').style.display = 'none';
+    document.getElementById('correo-input').value = '';
+    return;
+  }
+  registros.push(...nuevas);
+  save();
+  const msg = duplicadas > 0
+    ? `${nuevas.length} carrera${nuevas.length>1?'s':''} guardadas · ${duplicadas} duplicada${duplicadas>1?'s':''} omitida${duplicadas>1?'s':''}`
+    : `${nuevas.length} carrera${nuevas.length>1?'s':''} guardada${nuevas.length>1?'s':''} exitosamente`;
+  toast(msg, 'green');
+  previewCarreras = [];
+  document.getElementById('preview-section').style.display = 'none';
+  document.getElementById('correo-input').value = '';
+}
+
+function exportarPreviewCSV() {
+  descargarCSV(previewCarreras, 'carreras_preview.csv');
+}
+
+// ============ REGISTRO MANUAL ============
+function guardarRegistroManual() {
+  const fecha = document.getElementById('r-fecha').value;
+  const placa = document.getElementById('r-placa').value;
+  if(!fecha || !placa) { toast('Completa fecha y vehículo', 'red'); return; }
+  const monto = parseFloat(document.getElementById('r-monto').value) || 0;
+  const km = parseFloat(document.getElementById('r-km').value) || 0;
+  const vehiculo = placa.startsWith('V1') ? 'V1' : 'V2';
+  registros.push({
+    fecha, placa, vehiculo,
+    conductor: document.getElementById('r-conductor').value,
+    carreras: parseInt(document.getElementById('r-carreras').value) || 1,
+    km, tarifa: monto,
+    tipo: document.getElementById('r-tipo').value,
+    efectivo: parseFloat(document.getElementById('r-efectivo').value) || 0,
+    boucher: parseFloat(document.getElementById('r-boucher').value) || 0,
+    trabajo: document.getElementById('r-trabajo').value,
+    motivo: document.getElementById('r-motivo').value,
+    fuente: 'manual', id: Date.now()+Math.random()
+  });
+  save();
+  toast('Registro guardado', 'green');
+  limpiarFormRegistro();
+}
+
+function limpiarFormRegistro() {
+  ['r-conductor','r-carreras','r-km','r-monto','r-efectivo','r-boucher','r-motivo'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('r-fecha').value = hoy();
+}
+
+// ============ GASTOS ============
+function guardarGasto() {
+  const monto = parseFloat(document.getElementById('g-monto').value) || 0;
+  if(!monto) { toast('Ingresa un monto', 'red'); return; }
+  gastos.push({
+    fecha: document.getElementById('g-fecha').value,
+    placa: document.getElementById('g-placa').value,
+    tipo: document.getElementById('g-tipo').value,
+    monto,
+    desc: document.getElementById('g-desc').value,
+    id: Date.now()+Math.random()
+  });
+  save();
+  toast('Gasto registrado', 'green');
+  document.getElementById('g-monto').value = '';
+  document.getElementById('g-desc').value = '';
+  renderGastos();
+}
+
+function renderGastos() {
+  const wrap = document.getElementById('tabla-gastos-wrap');
+  if(!gastos.length) { wrap.innerHTML = '<div class="empty-state">No hay gastos registrados aún.</div>'; return; }
+  const sorted = [...gastos].sort((a,b) => b.fecha.localeCompare(a.fecha));
+  wrap.innerHTML = `<table><thead><tr>
+    <th>Fecha</th><th>Vehículo</th><th>Tipo</th><th>Descripción</th><th>Monto</th><th></th>
+  </tr></thead><tbody>` + sorted.map((g,i) => `<tr>
+    <td style="font-family:'DM Mono',monospace;font-size:11px">${g.fecha}</td>
+    <td><span class="placa">${g.placa}</span></td>
+    <td><span class="tag tag-amber">${g.tipo}</span></td>
+    <td>${g.desc||'—'}</td>
+    <td style="font-weight:600;color:var(--red)">-$${g.monto.toFixed(2)}</td>
+    <td><button class="btn-danger-sm" onclick="borrarGasto('${g.id}')">✕</button></td>
+  </tr>`).join('') + '</tbody></table>';
+}
+
+function borrarGasto(id) {
+  if(confirm('¿Eliminar este gasto?')) { gastos = gastos.filter(g => String(g.id) !== String(id)); save(); renderGastos(); }
+}
+
+function exportarGastosCSV() { descargarCSV(gastos, 'gastos_fastline.csv'); }
+
+// ============ RESUMEN ============
+function filtrarPeriodo(arr, periodo) {
+  const t = new Date(), hoyStr = hoy();
+  if(periodo === 'hoy') return arr.filter(r => r.fecha === hoyStr);
+  if(periodo === 'semana') {
+    const lunes = new Date(t); lunes.setDate(t.getDate() - ((t.getDay()+6)%7));
+    return arr.filter(r => r.fecha >= lunes.toISOString().slice(0,10));
+  }
+  if(periodo === 'mes') { const mes = hoyStr.slice(0,7); return arr.filter(r => r.fecha.startsWith(mes)); }
+  return arr;
+}
+
+function calcVeh(regs, gasts, veh) {
+  const r = veh === 'ambos' ? regs : regs.filter(x => (x.vehiculo||'').startsWith(veh) || (x.placa||'').startsWith(veh));
+  const g = veh === 'ambos' ? gasts : gasts.filter(x => x.placa.includes(veh) || x.placa === 'Ambos');
+  const ingresos = r.reduce((s,x) => s + (x.tarifa||0), 0);
+  const totalGastos = g.reduce((s,x) => s + x.monto, 0);
+  const km = r.reduce((s,x) => s + (x.km||0), 0);
+  return { ingresos, totalGastos, neto: ingresos - totalGastos, km, n: r.length };
+}
+
+function renderResumen() {
+  const periodo = document.getElementById('res-periodo').value;
+  const veh = document.getElementById('res-vehiculo').value;
+  const regs = filtrarPeriodo(registros, periodo);
+  const gasts = filtrarPeriodo(gastos, periodo);
+  const s = calcVeh(regs, gasts, veh);
+
+  document.getElementById('cards-resumen').innerHTML = `
+    <div class="metric"><div class="metric-label">Ingresos</div><div class="metric-val green">$${s.ingresos.toFixed(2)}</div></div>
+    <div class="metric"><div class="metric-label">Gastos</div><div class="metric-val red">$${s.totalGastos.toFixed(2)}</div></div>
+    <div class="metric"><div class="metric-label">Neto</div><div class="metric-val ${s.neto>=0?'green':'red'}">$${s.neto.toFixed(2)}</div></div>
+    <div class="metric"><div class="metric-label">Km totales</div><div class="metric-val blue">${s.km.toFixed(1)}</div><div class="metric-sub">kilómetros</div></div>
+    <div class="metric"><div class="metric-label">Carreras / registros</div><div class="metric-val">${s.n}</div></div>
+    <div class="metric"><div class="metric-label">Promedio por carrera</div><div class="metric-val">$${s.n?(s.ingresos/s.n).toFixed(2):'0.00'}</div></div>
+  `;
+
+  function statBox(veh2) {
+    const sv = calcVeh(regs, gasts, veh2);
+    return `
+      <div class="stat-row"><span class="stat-label">Ingresos</span><span style="color:var(--green);font-weight:500">$${sv.ingresos.toFixed(2)}</span></div>
+      <div class="stat-row"><span class="stat-label">Gastos</span><span style="color:var(--red)">-$${sv.totalGastos.toFixed(2)}</span></div>
+      <div class="stat-row"><span class="stat-label">Km</span><span>${sv.km.toFixed(1)} km</span></div>
+      <div class="stat-row"><span class="stat-label">Carreras</span><span>${sv.n}</span></div>
+      <div class="stat-row"><span class="stat-label">Neto</span><span style="color:${sv.neto>=0?'var(--green)':'var(--red)'};font-weight:600">$${sv.neto.toFixed(2)}</span></div>
+    `;
+  }
+  document.getElementById('stats-v1').innerHTML = statBox('V1');
+  document.getElementById('stats-v2').innerHTML = statBox('V2');
+
+  // Empresas
+  const empresas = {};
+  regs.forEach(r => {
+    const e = r.empresa || 'Sin empresa';
+    if(!empresas[e]) empresas[e] = { n:0, total:0 };
+    empresas[e].n++;
+    empresas[e].total += (r.tarifa||0);
+  });
+  const sorted = Object.entries(empresas).sort((a,b) => b[1].total - a[1].total);
+  document.getElementById('tabla-empresas').innerHTML = sorted.length ? `
+    <table><thead><tr><th>Empresa</th><th>Carreras</th><th>Total ($)</th><th>Promedio</th></tr></thead>
+    <tbody>${sorted.map(([e,d]) => `<tr>
+      <td>${e}</td><td>${d.n}</td>
+      <td style="font-weight:500;color:var(--green)">$${d.total.toFixed(2)}</td>
+      <td>$${(d.total/d.n).toFixed(2)}</td>
+    </tr>`).join('')}</tbody></table>
+  ` : '<div class="empty-state">Sin datos para el período seleccionado.</div>';
+}
+
+// ============ HISTORIAL ============
+function renderHistorial() {
+  const MESES = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const filtro = document.getElementById('h-filtro-placa').value;
+  const filtered = filtro === 'todos' ? registros : registros.filter(r => (r.vehiculo||'').startsWith(filtro) || (r.placa||'').startsWith(filtro));
+  const sorted = [...filtered].sort((a,b) => b.fecha.localeCompare(a.fecha));
+  const wrap = document.getElementById('tabla-historial-wrap');
+  if(!sorted.length) { wrap.innerHTML = '<div class="empty-state">No hay registros.</div>'; return; }
+
+  // Agrupar por mes
+  const porMes = {};
+  sorted.forEach(r => {
+    const k = (r.fecha||'').slice(0,7);
+    if(!porMes[k]) porMes[k] = [];
+    porMes[k].push(r);
+  });
+  const meses = Object.keys(porMes).sort().reverse();
+
+  let html = `<table><thead><tr>
+    <th>Fecha</th><th>Placa</th><th>Conductor</th><th>Empresa</th><th>Origen → Destino</th>
+    <th>Km</th><th>Tarifa</th><th>Tipo</th><th>Voucher</th><th>Fuente</th><th></th>
+  </tr></thead><tbody>`;
+
+  meses.forEach(k => {
+    const [anio, mes] = k.split('-');
+    const regs = porMes[k];
+    const totalTarifa = regs.reduce((a,r)=>a+(r.tarifa||0),0);
+    const totalKm = regs.reduce((a,r)=>a+(r.km||0),0);
+
+    // Encabezado del mes
+    html += `<tr><td colspan="11" style="background:#1a3a5c;color:#fff;font-weight:700;font-size:13px;padding:8px 12px;letter-spacing:0.5px">
+      📅 ${MESES[+mes]} ${anio} &nbsp;·&nbsp; ${regs.length} carreras &nbsp;·&nbsp; ${totalKm.toFixed(1)} km &nbsp;·&nbsp; <span style="color:#7dd3b0">$${totalTarifa.toFixed(2)}</span>
+    </td></tr>`;
+
+    // Filas del mes
+    html += regs.map(r => `<tr>
+      <td style="font-family:'DM Mono',monospace;font-size:11px">${r.fecha}</td>
+      <td><span class="placa">${r.placa||'—'}</span></td>
+      <td style="white-space:nowrap">${cortar(r.conductor,16)}</td>
+      <td style="font-size:11px">${cortar(r.empresa,16)||'—'}</td>
+      <td style="font-size:11px;color:var(--muted)">${cortar(r.origen,18)||'—'} → ${cortar(r.destino,18)||'—'}</td>
+      <td>${(r.km||0).toFixed(2)}</td>
+      <td style="font-weight:600;color:var(--green)">$${(r.tarifa||0).toFixed(2)}</td>
+      <td><span class="tag ${r.tipo==='bóucher'?'tag-blue':r.tipo==='ticket'?'tag-amber':'tag-green'}">${r.tipo||'—'}</span></td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px">${r.voucher||'—'}</td>
+      <td><span class="tag tag-gray">${r.fuente||'manual'}</span></td>
+      <td><button class="btn-danger-sm" onclick="borrarRegistro('${r.id}')">✕</button></td>
+    </tr>`).join('');
+
+    // Subtotal del mes
+    html += `<tr style="background:#e8f0fa;font-weight:700;font-size:12px">
+      <td colspan="5" style="text-align:right;padding:6px 10px;color:#1a3a5c">Subtotal ${MESES[+mes]}:</td>
+      <td style="color:#1a3a5c">${totalKm.toFixed(2)}</td>
+      <td style="color:var(--green)">$${totalTarifa.toFixed(2)}</td>
+      <td colspan="4"></td>
+    </tr>`;
+  });
+
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+function borrarRegistro(id) {
+  if(confirm('¿Eliminar este registro?')) { registros = registros.filter(r => String(r.id) !== String(id)); save(); renderHistorial(); }
+}
+
+function limpiarTodo() {
+  if(confirm('¿Seguro que quieres borrar TODOS los registros? Esta acción no se puede deshacer.')) {
+    registros = []; save(); renderHistorial(); toast('Todos los registros eliminados');
+  }
+}
+
+function exportarHistorialCSV() { descargarCSV(registros, 'historial_fastline.csv'); }
+
+// ============ UTILS ============
+function cortar(str, max) { if(!str) return '—'; return str.length > max ? str.slice(0,max)+'…' : str; }
+
+function descargarCSV(data, nombre) {
+  if(!data.length) { toast('No hay datos para exportar', 'red'); return; }
+  const keys = Object.keys(data[0]).filter(k => k !== 'id');
+  const csv = [keys, ...data.map(row => keys.map(k => `"${(row[k]||'').toString().replace(/"/g,"'")}"`))]
+    .map(r => r.join(',')).join('\n');
+  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = nombre;
+  a.click();
+  toast('Archivo descargado', 'green');
+}
+
+// ============ PEGAR DESDE PORTAPAPELES ============
+async function pegarCorreoPortapapeles() {
+  try {
+    const texto = await navigator.clipboard.readText();
+    if (!texto.trim()) { toast('El portapapeles está vacío. Use el marcador en Hotmail primero.', 'red'); return; }
+    const ta = document.getElementById('correo-input');
+    ta.value = ta.value ? ta.value + '\n\n' + texto : texto;
+    toast('Correo agregado ✓ — puede pegar más o hacer clic en Extraer carreras', 'green');
+  } catch(e) {
+    toast('Permita el acceso al portapapeles cuando el navegador lo pida', 'red');
+  }
+}
+
+// ============ HOTMAIL / MICROSOFT GRAPH ============
+const MSAL_CLIENT_ID = 'a6899a29-bb17-474a-892a-fa6ce3f0e4bb';
+let msalApp = null;
+let msalAccount = null;
+
+function initMsal() {
+  if (MSAL_CLIENT_ID === 'PENDIENTE') return;
+  msalApp = new msal.PublicClientApplication({
+    auth: {
+      clientId: MSAL_CLIENT_ID,
+      authority: 'https://login.microsoftonline.com/consumers',
+      redirectUri: 'http://localhost:3000/'
+    },
+    cache: { cacheLocation: 'localStorage' }
+  });
+  const cuentas = msalApp.getAllAccounts();
+  if (cuentas.length > 0) {
+    msalAccount = cuentas[0];
+    setHmEstado('conectado', msalAccount.username);
+  }
+}
+
+async function conectarHotmail() {
+  if (MSAL_CLIENT_ID === 'PENDIENTE') {
+    toast('Falta el Client ID de Microsoft Azure. Siga los pasos de configuración.', 'red');
+    return;
+  }
+  try {
+    const resp = await msalApp.loginPopup({ scopes: ['Mail.Read'] });
+    msalAccount = resp.account;
+    setHmEstado('conectado', msalAccount.username);
+    toast('Conectado a ' + msalAccount.username, 'green');
+  } catch(e) {
+    if (e.errorCode !== 'user_cancelled') toast('Error al conectar: ' + e.message, 'red');
+  }
+}
+
+async function importarCorreosHotmail() {
+  if (!msalAccount) { await conectarHotmail(); return; }
+  // Últimos 30 días por defecto
+  const hasta = hoy();
+  const desdeDate = new Date(); desdeDate.setDate(desdeDate.getDate() - 30);
+  const desde = desdeDate.toISOString().slice(0,10);
+
+  setHmEstado('cargando', '');
+  try {
+    const token = await msalApp.acquireTokenSilent({ scopes: ['Mail.Read'], account: msalAccount });
+    let url = `https://graph.microsoft.com/v1.0/me/messages?$search="fin de viaje"&$top=200&$select=subject,body,receivedDateTime`;
+    let todos = [];
+    while (url) {
+      const r = await fetch(url, {
+        headers: {
+          Authorization: 'Bearer ' + token.accessToken,
+          'Prefer': 'outlook.body-content-type="text"'
+        }
+      });
+      const d = await r.json();
+      if (d.value) todos.push(...d.value);
+      url = d['@odata.nextLink'] || null;
+    }
+
+    const filtrados = todos.filter(m => {
+      const f = (m.receivedDateTime || '').slice(0, 10);
+      return f >= desde && f <= hasta;
+    });
+
+    if (!filtrados.length) {
+      toast('No se encontraron correos de "fin de viaje" en ese período', 'red');
+      setHmEstado('conectado', msalAccount.username);
+      return;
+    }
+
+    const texto = filtrados.map(m => m.body?.content || '').join('\n\n');
+    document.getElementById('correo-input').value = texto;
+    setHmEstado('conectado', msalAccount.username);
+    toast(filtrados.length + ' correos importados — revise y guarde', 'green');
+    parsearCorreos();
+  } catch(e) {
+    toast('Error al leer correos: ' + e.message, 'red');
+    setHmEstado('conectado', msalAccount.username);
+  }
+}
+
+function desconectarHotmail() {
+  if (msalApp && msalAccount) msalApp.logoutPopup({ account: msalAccount });
+  msalAccount = null;
+  setHmEstado('desconectado', '');
+}
+
+function setHmEstado(estado, info) {
+  const statusEl = document.getElementById('hm-estado');
+  const btns = document.getElementById('hm-btns');
+  if (!statusEl || !btns) return;
+  if (estado === 'conectado') {
+    statusEl.innerHTML = `✅ Conectado como <strong>${info}</strong>`;
+    statusEl.style.background = '#e8f5ee';
+    statusEl.style.borderColor = '#a7f3d0';
+    statusEl.style.color = '#1e6b3c';
+    btns.innerHTML = `<button class="btn btn-success" style="font-size:14px;padding:10px 22px" onclick="importarCorreosHotmail()">📥 Importar carreras automáticamente</button>
+      <button class="btn btn-outline" style="margin-left:8px" onclick="desconectarHotmail()">Desconectar</button>`;
+  } else if (estado === 'cargando') {
+    statusEl.innerHTML = `⏳ Leyendo correos de Hotmail...`;
+    btns.innerHTML = `<button class="btn btn-primary" style="background:#0078d4" disabled>⏳ Importando...</button>`;
+  } else {
+    statusEl.innerHTML = `⬜ No conectado`;
+    statusEl.style.background = '#fff';
+    statusEl.style.borderColor = '#cce0ff';
+    statusEl.style.color = '#1a3a5c';
+    btns.innerHTML = `<button class="btn btn-primary" style="background:#0078d4;font-size:14px;padding:10px 22px" onclick="conectarHotmail()">🔗 Conectar con Hotmail</button>`;
+  }
+}
+
+window.addEventListener('load', () => {
+  initMsal();
+});
+</script>
+</body>
+</html>
