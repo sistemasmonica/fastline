@@ -627,10 +627,15 @@ function renderPreview() {
   `).join('');
 }
 
+function claveDedupe(c) {
+  if (c.voucher && c.voucher !== '0') return 'v:' + c.voucher;
+  return 'c:' + c.fecha + '|' + c.placa + '|' + c.tarifa + '|' + c.origen + '|' + c.destino;
+}
+
 function confirmarCarreras() {
   if(!previewCarreras.length) return;
-  const vouchersExistentes = new Set(registros.map(r => r.voucher).filter(Boolean));
-  const nuevas = previewCarreras.filter(c => !c.voucher || !vouchersExistentes.has(c.voucher));
+  const clavesExistentes = new Set(registros.map(claveDedupe));
+  const nuevas = previewCarreras.filter(c => !clavesExistentes.has(claveDedupe(c)));
   const duplicadas = previewCarreras.length - nuevas.length;
   if(!nuevas.length) {
     toast(`Todos los correos ya estaban cargados (${duplicadas} duplicados omitidos)`, 'red');
