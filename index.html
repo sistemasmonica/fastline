@@ -935,14 +935,17 @@ async function conectarHotmail() {
 async function importarCorreosHotmail() {
   if (!msalAccount) { await conectarHotmail(); return; }
   // Últimos 30 días por defecto
-  const hasta = hoy();
   const desdeDate = new Date(); desdeDate.setDate(desdeDate.getDate() - 30);
-  const desde = desdeDate.toISOString().slice(0,10);
+  const desdeISO = desdeDate.toISOString();
+  const hastaISO = new Date().toISOString();
 
   setHmEstado('cargando', '');
   try {
     const token = await msalApp.acquireTokenSilent({ scopes: ['Mail.Read'], account: msalAccount });
-    let url = `https://graph.microsoft.com/v1.0/me/messages?$search="fin de viaje"&$top=200&$select=subject,body,receivedDateTime`;
+    // Se usa $filter por fecha (en vez de $search) porque la búsqueda de texto de Graph
+    // no es confiable para cuentas personales de Hotmail/Outlook — a veces no encuentra
+    // correos que sí existen. Filtramos por texto nosotros mismos, del lado del cliente.
+    let url = `https://graph.microsoft.com/v1.0/me/messages?$filter=receivedDateTime ge ${encodeURIComponent(desdeISO)} and receivedDateTime le ${encodeURIComponent(hastaISO)}&$orderby=receivedDateTime desc&$top=200&$select=subject,body,receivedDateTime`;
     let todos = [];
     while (url) {
       const r = await fetch(url, {
@@ -957,8 +960,8 @@ async function importarCorreosHotmail() {
     }
 
     const filtrados = todos.filter(m => {
-      const f = (m.receivedDateTime || '').slice(0, 10);
-      return f >= desde && f <= hasta;
+      const texto = ((m.subject || '') + ' ' + (m.body?.content || '')).toLowerCase();
+      return texto.includes('fin de viaje');
     });
 
     if (!filtrados.length) {
