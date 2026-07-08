@@ -628,7 +628,7 @@ function renderPreview() {
 }
 
 function claveDedupe(c) {
-  if (c.voucher && c.voucher !== '0') return 'v:' + c.voucher;
+  if (c.voucher && /\d/.test(c.voucher)) return 'v:' + c.voucher;
   return 'c:' + c.fecha + '|' + c.placa + '|' + c.tarifa + '|' + c.origen + '|' + c.destino;
 }
 
@@ -639,10 +639,6 @@ function confirmarCarreras() {
   const duplicadas = previewCarreras.length - nuevas.length;
   if(!nuevas.length) {
     toast(`Todos los correos ya estaban cargados (${duplicadas} duplicados omitidos)`, 'red');
-    const fmt = c => `${c.fecha} | ${c.placa} | $${c.tarifa} | ${c.origen} -> ${c.destino}`;
-    const ejemplosNuevos = previewCarreras.slice(0, 5).map(fmt).join('\n');
-    const ejemplosExistentes = registros.slice(0, 5).map(fmt).join('\n');
-    alert('DIAGNOSTICO TEMPORAL\n\nEjemplos de lo que intentabas guardar:\n' + ejemplosNuevos + '\n\nEjemplos de lo que ya estaba guardado:\n' + ejemplosExistentes);
     previewCarreras = [];
     document.getElementById('preview-section').style.display = 'none';
     document.getElementById('correo-input').value = '';
