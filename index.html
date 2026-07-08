@@ -955,6 +955,7 @@ async function importarCorreosHotmail() {
         }
       });
       const d = await r.json();
+      if (d.error) throw new Error(d.error.message || JSON.stringify(d.error));
       if (d.value) todos.push(...d.value);
       url = d['@odata.nextLink'] || null;
     }
@@ -965,7 +966,7 @@ async function importarCorreosHotmail() {
     });
 
     if (!filtrados.length) {
-      toast('No se encontraron correos de "fin de viaje" en ese período', 'red');
+      toast(`No se encontraron correos de "fin de viaje" (se revisaron ${todos.length} correos en ese período)`, 'red');
       setHmEstado('conectado', msalAccount.username);
       return;
     }
