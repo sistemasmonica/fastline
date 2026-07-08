@@ -967,7 +967,8 @@ async function importarCorreosHotmail() {
 
     if (!filtrados.length) {
       toast(`No se encontraron correos de "fin de viaje" (se revisaron ${todos.length} correos en ese período)`, 'red');
-      setHmEstado('conectado', msalAccount.username);
+      const ejemplos = todos.slice(0, 8).map(m => `• ${m.subject || '(sin asunto)'}`).join('<br>');
+      document.getElementById('hm-estado').innerHTML = `✅ Conectado como <strong>${msalAccount.username}</strong><br><br>⚠️ Asuntos de ejemplo revisados (ninguno coincidió):<br>${ejemplos || '(ninguno)'}`;
       return;
     }
 
