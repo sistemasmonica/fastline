@@ -370,6 +370,15 @@ PLACA PFN3446"></textarea>
     </div>
   </div>
 
+  <div class="card">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>⚡ Accesos rápidos</span>
+      <button class="btn btn-outline btn-sm" onclick="agregarPreset()">+ Nuevo</button>
+    </div>
+    <div class="hint" style="margin-top:0;margin-bottom:10px">Un clic registra el gasto de inmediato usando la Fecha y el Vehículo que tengas seleccionados arriba. Útil para peajes u otros gastos que repites seguido.</div>
+    <div id="gasto-presets" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+  </div>
+
   <div class="section-header">
     <div style="font-size:14px;font-weight:600">Gastos registrados</div>
     <button class="btn btn-outline btn-sm" onclick="exportarGastosCSV()">📥 Exportar CSV</button>
@@ -443,6 +452,7 @@ const sb = window.supabase.createClient(SUPA_URL, SUPA_KEY);
 // ============ STATE ============
 let registros = JSON.parse(localStorage.getItem('fl_registros') || '[]');
 let gastos = JSON.parse(localStorage.getItem('fl_gastos') || '[]');
+let gastoPresets = JSON.parse(localStorage.getItem('fl_gastopresets') || '[]');
 let previewCarreras = [];
 
 // ============ INIT ============
@@ -466,17 +476,19 @@ function setCloudStatus(estado) {
 function save() {
   localStorage.setItem('fl_registros', JSON.stringify(registros));
   localStorage.setItem('fl_gastos', JSON.stringify(gastos));
+  localStorage.setItem('fl_gastopresets', JSON.stringify(gastoPresets));
   saveToCloud();
 }
 
 async function saveToCloud() {
   const ts = new Date().toISOString();
   try {
-    const [r1, r2] = await Promise.all([
+    const [r1, r2, r3] = await Promise.all([
       sb.from('app_data').upsert({ key: 'fl_registros', value: { data: registros }, updated_at: ts }),
-      sb.from('app_data').upsert({ key: 'fl_gastos', value: { data: gastos }, updated_at: ts })
+      sb.from('app_data').upsert({ key: 'fl_gastos', value: { data: gastos }, updated_at: ts }),
+      sb.from('app_data').upsert({ key: 'fl_gastopresets', value: { data: gastoPresets }, updated_at: ts })
     ]);
-    if (r1.error || r2.error) throw new Error((r1.error && r1.error.message) || (r2.error && r2.error.message));
+    if (r1.error || r2.error || r3.error) throw new Error((r1.error && r1.error.message) || (r2.error && r2.error.message) || (r3.error && r3.error.message));
     setCloudStatus('ok');
   } catch(e) {
     console.warn('Error guardando en nube:', e);
@@ -488,9 +500,10 @@ async function saveToCloud() {
 async function syncFromCloud() {
   setCloudStatus('conectando');
   try {
-    const [r1, r2] = await Promise.all([
+    const [r1, r2, r3] = await Promise.all([
       sb.from('app_data').select('value').eq('key', 'fl_registros').maybeSingle(),
-      sb.from('app_data').select('value').eq('key', 'fl_gastos').maybeSingle()
+      sb.from('app_data').select('value').eq('key', 'fl_gastos').maybeSingle(),
+      sb.from('app_data').select('value').eq('key', 'fl_gastopresets').maybeSingle()
     ]);
     if (r1.data?.value?.data) {
       registros = r1.data.value.data;
@@ -499,6 +512,10 @@ async function syncFromCloud() {
     if (r2.data?.value?.data) {
       gastos = r2.data.value.data;
       localStorage.setItem('fl_gastos', JSON.stringify(gastos));
+    }
+    if (r3.data?.value?.data) {
+      gastoPresets = r3.data.value.data;
+      localStorage.setItem('fl_gastopresets', JSON.stringify(gastoPresets));
     }
     setCloudStatus('ok');
     renderTodo();
@@ -513,6 +530,7 @@ async function syncFromCloud() {
 
 function renderTodo() {
   renderGastos();
+  renderGastoPresets();
   renderHistorial();
   renderResumen();
 }
@@ -537,7 +555,7 @@ function showTab(name) {
   document.getElementById('page-'+name).classList.add('active');
   if(name==='resumen') renderResumen();
   if(name==='historial') renderHistorial();
-  if(name==='gastos') renderGastos();
+  if(name==='gastos') { renderGastos(); renderGastoPresets(); }
 }
 
 // ============ TOAST ============
@@ -706,6 +724,60 @@ function guardarGasto() {
   document.getElementById('g-monto').value = '';
   document.getElementById('g-desc').value = '';
   renderGastos();
+}
+
+// ============ ACCESOS RÁPIDOS DE GASTOS ============
+function agregarPreset() {
+  const nombre = prompt('Nombre del acceso rápido (ej: Peaje Guayasamín):');
+  if(!nombre) return;
+  const montoStr = prompt('Monto ($) para "'+nombre+'":');
+  if(montoStr === null) return;
+  const monto = parseFloat(montoStr);
+  if(!monto || monto <= 0) { toast('Monto inválido', 'red'); return; }
+  const tipo = document.getElementById('g-tipo').value;
+  gastoPresets.push({ id: Date.now()+Math.random(), nombre, monto, tipo });
+  save();
+  renderGastoPresets();
+  toast('Acceso rápido creado', 'green');
+}
+
+function usarPreset(id) {
+  const p = gastoPresets.find(x => String(x.id) === String(id));
+  if(!p) return;
+  gastos.push({
+    fecha: document.getElementById('g-fecha').value || hoy(),
+    placa: document.getElementById('g-placa').value,
+    tipo: p.tipo,
+    monto: p.monto,
+    desc: p.nombre,
+    id: Date.now()+Math.random()
+  });
+  save();
+  toast(p.nombre + ' — $' + p.monto.toFixed(2) + ' registrado', 'green');
+  renderGastos();
+}
+
+function borrarPreset(id, ev) {
+  ev.stopPropagation();
+  const p = gastoPresets.find(x => String(x.id) === String(id));
+  if(!p) return;
+  if(!confirm('¿Eliminar el acceso rápido "'+p.nombre+'"?')) return;
+  gastoPresets = gastoPresets.filter(x => String(x.id) !== String(id));
+  save();
+  renderGastoPresets();
+}
+
+function renderGastoPresets() {
+  const wrap = document.getElementById('gasto-presets');
+  if(!wrap) return;
+  if(!gastoPresets.length) { wrap.innerHTML = '<div class="hint" style="margin:0">Aún no tienes accesos rápidos. Presiona "+ Nuevo" arriba para crear uno (ej: un peaje que pagas seguido).</div>'; return; }
+  wrap.innerHTML = gastoPresets.map(p => `
+    <button class="btn btn-outline btn-sm" onclick="usarPreset('${p.id}')" style="gap:9px">
+      <span class="tag tag-amber" style="pointer-events:none">${p.tipo}</span>
+      <span>${p.nombre} — $${p.monto.toFixed(2)}</span>
+      <span onclick="borrarPreset('${p.id}', event)" style="color:var(--muted);padding-left:4px" title="Eliminar">✕</span>
+    </button>
+  `).join('');
 }
 
 function renderGastos() {
