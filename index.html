@@ -399,7 +399,7 @@ PLACA PFN3446"></textarea>
 
   <div class="section-header">
     <div style="font-size:14px;font-weight:600">Gastos registrados</div>
-    <button class="btn btn-outline btn-sm" onclick="exportarGastosCSV()">📥 Exportar CSV</button>
+    <button class="btn btn-outline btn-sm" onclick="exportarGastosCSV()">📥 Exportar Excel</button>
   </div>
   <div class="table-wrap" id="tabla-gastos-wrap">
     <div class="empty-state">No hay gastos registrados aún.</div>
@@ -456,7 +456,7 @@ PLACA PFN3446"></textarea>
         <option value="V1">Vehículo 1</option>
         <option value="V2">Vehículo 2</option>
       </select>
-      <button class="btn btn-outline btn-sm" onclick="exportarHistorialCSV()">📥 Exportar CSV</button>
+      <button class="btn btn-outline btn-sm" onclick="exportarHistorialCSV()">📥 Exportar Excel</button>
       <button class="btn btn-outline btn-sm" onclick="limpiarTodo()" style="color:var(--red)">🗑️ Borrar todo</button>
     </div>
   </div>
@@ -1054,17 +1054,24 @@ function exportarHistorialCSV() { descargarCSV(registros, 'historial_fastline.cs
 // ============ UTILS ============
 function cortar(str, max) { if(!str) return '—'; return str.length > max ? str.slice(0,max)+'…' : str; }
 
+function escHtmlCsv(s) { return (s??'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
 function descargarCSV(data, nombre) {
   if(!data.length) { toast('No hay datos para exportar', 'red'); return; }
   const keys = Object.keys(data[0]).filter(k => k !== 'id' && k !== 'origenId');
-  const csv = [keys, ...data.map(row => keys.map(k => `"${(row[k]||'').toString().replace(/"/g,"'")}"`))]
-    .map(r => r.join(';')).join('\n');
-  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8'});
+  // Se genera como tabla HTML (no CSV con separadores) para que Excel siempre
+  // muestre las columnas bien, sin importar si la configuraci\u00F3n regional usa
+  // coma o punto y coma como separador.
+  const html = `<html><head><meta charset="UTF-8"></head><body><table border="1">
+    <thead><tr>${keys.map(k => `<th>${escHtmlCsv(k)}</th>`).join('')}</tr></thead>
+    <tbody>${data.map(row => `<tr>${keys.map(k => `<td>${escHtmlCsv(row[k])}</td>`).join('')}</tr>`).join('')}</tbody>
+  </table></body></html>`;
+  const blob = new Blob(['\uFEFF'+html], {type:'application/vnd.ms-excel;charset=utf-8'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = nombre;
+  a.download = nombre.replace(/\.csv$/i, '.xls');
   a.click();
-  toast('Archivo descargado', 'green');
+  toast('Archivo descargado \u2014 si Excel pregunta si quieres abrirlo igual, presiona "S\u00ED"', 'green');
 }
 
 // ============ PEGAR DESDE PORTAPAPELES ============
