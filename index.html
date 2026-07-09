@@ -436,6 +436,11 @@ PLACA PFN3446"></textarea>
   </div>
 
   <div class="card">
+    <div class="card-title">💸 Gastos por tipo (período seleccionado)</div>
+    <div id="tabla-gastos-tipo"></div>
+  </div>
+
+  <div class="card">
     <div class="card-title">📋 Carreras por empresa (período seleccionado)</div>
     <div id="tabla-empresas"></div>
   </div>
@@ -925,6 +930,24 @@ function renderResumen() {
   }
   document.getElementById('stats-v1').innerHTML = statBox('V1');
   document.getElementById('stats-v2').innerHTML = statBox('V2');
+
+  // Gastos por tipo
+  const gastosFiltrados = veh === 'ambos' ? gasts : gasts.filter(x => x.placa.includes(veh) || x.placa === 'Ambos');
+  const porTipo = {};
+  gastosFiltrados.forEach(g => {
+    const t = g.tipo || 'Otro';
+    if(!porTipo[t]) porTipo[t] = { n:0, total:0 };
+    porTipo[t].n++;
+    porTipo[t].total += g.monto;
+  });
+  const tiposSorted = Object.entries(porTipo).sort((a,b) => b[1].total - a[1].total);
+  document.getElementById('tabla-gastos-tipo').innerHTML = tiposSorted.length ? `
+    <table><thead><tr><th>Tipo</th><th>Cantidad</th><th>Total ($)</th></tr></thead>
+    <tbody>${tiposSorted.map(([t,d]) => `<tr>
+      <td><span class="tag tag-amber">${t}</span></td><td>${d.n}</td>
+      <td style="font-weight:500;color:var(--red)">-$${d.total.toFixed(2)}</td>
+    </tr>`).join('')}</tbody></table>
+  ` : '<div class="empty-state">Sin gastos para el período seleccionado.</div>';
 
   // Empresas
   const empresas = {};
