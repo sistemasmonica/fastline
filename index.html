@@ -379,6 +379,24 @@ PLACA PFN3446"></textarea>
     <div id="gasto-presets" style="display:flex;flex-wrap:wrap;gap:8px"></div>
   </div>
 
+  <div class="card">
+    <div class="card-title">🛣️ Importar historial de peajes</div>
+    <div class="hint" style="margin-top:0">En el portal del peaje (Guayasamín, Panavial, etc.), selecciona con el mouse las filas de la tabla y presiona Ctrl+C. Pega ese texto aquí abajo — el sistema crea un gasto por cada fila automáticamente y evita duplicados si vuelves a pegar fechas ya importadas.</div>
+    <div class="form-grid">
+      <div class="field"><label>Peaje</label>
+        <select id="peaje-fuente">
+          <option value="Peaje Guayasamín">Peaje Guayasamín (Túnel)</option>
+          <option value="Peaje Panavial">Peaje Panavial</option>
+          <option value="Peaje">Otro peaje</option>
+        </select>
+      </div>
+    </div>
+    <textarea id="peaje-texto" placeholder="Pega aquí las filas copiadas de la tabla del portal..." style="min-height:120px"></textarea>
+    <div class="btn-row" style="margin-top:10px">
+      <button class="btn btn-primary" onclick="importarPeajes()">📥 Importar peajes</button>
+    </div>
+  </div>
+
   <div class="section-header">
     <div style="font-size:14px;font-weight:600">Gastos registrados</div>
     <button class="btn btn-outline btn-sm" onclick="exportarGastosCSV()">📥 Exportar CSV</button>
@@ -778,6 +796,62 @@ function renderGastoPresets() {
       <span onclick="borrarPreset('${p.id}', event)" style="color:var(--muted);padding-left:4px" title="Eliminar">✕</span>
     </button>
   `).join('');
+}
+
+// ============ IMPORTAR HISTORIAL DE PEAJES ============
+function parsearLineaPeaje(linea) {
+  let f = linea.split('\t').map(c => c.trim()).filter(c => c !== '');
+  if(f.length < 6) f = linea.split(/\s{2,}/).map(c => c.trim()).filter(c => c !== '');
+  if(f.length < 6) return null;
+  const m = f[0].match(/(\d{2})\/(\d{2})\/(\d{4}),?\s*(\d{2}:\d{2}:\d{2})/);
+  if(!m) return null;
+  const [, dd, mm, yyyy, hora] = m;
+  const valor = parseFloat(String(f[4]).replace(',', '.'));
+  if(!valor) return null;
+  return {
+    fechaISO: `${yyyy}-${mm}-${dd}`,
+    hora,
+    placa: f[1],
+    tipo: f[2],
+    sentido: f[3],
+    valor,
+    estado: (f[5] || '').toUpperCase()
+  };
+}
+
+function importarPeajes() {
+  const texto = document.getElementById('peaje-texto').value;
+  if(!texto.trim()) { toast('Pega el historial primero', 'red'); return; }
+  const peajeNombre = document.getElementById('peaje-fuente').value;
+  const opcionesPlaca = [...document.getElementById('g-placa').options];
+  const lineas = texto.split('\n').map(l => l.trim()).filter(Boolean);
+  let importados = 0, duplicados = 0, incompletos = 0, invalidos = 0;
+  lineas.forEach(linea => {
+    const r = parsearLineaPeaje(linea);
+    if(!r) { invalidos++; return; }
+    if(r.estado && r.estado !== 'COMPLETO') { incompletos++; return; }
+    const origenId = 'peaje_' + r.fechaISO + '_' + r.hora + '_' + r.placa + '_' + r.sentido;
+    if(gastos.some(g => g.origenId === origenId)) { duplicados++; return; }
+    const opcion = opcionesPlaca.find(o => o.value.includes(r.placa));
+    gastos.push({
+      fecha: r.fechaISO,
+      placa: opcion ? opcion.value : 'Ambos',
+      tipo: 'Peaje',
+      monto: r.valor,
+      desc: `${peajeNombre} · ${r.sentido} · ${r.hora}`,
+      id: Date.now() + Math.random(),
+      origenId
+    });
+    importados++;
+  });
+  if(importados) save();
+  renderGastos();
+  document.getElementById('peaje-texto').value = '';
+  let msg = importados + ' peaje' + (importados===1?'':'s') + ' importado' + (importados===1?'':'s');
+  if(duplicados) msg += ', ' + duplicados + ' ya existían (omitidos)';
+  if(incompletos) msg += ', ' + incompletos + ' sin completar (omitidos)';
+  if(invalidos) msg += ', ' + invalidos + ' filas no reconocidas';
+  toast(msg, importados ? 'green' : 'red');
 }
 
 function renderGastos() {
