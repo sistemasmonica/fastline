@@ -1029,20 +1029,34 @@ function renderHistorial() {
       📅 ${MESES[+mes]} ${anio} &nbsp;·&nbsp; ${regs.length} carreras &nbsp;·&nbsp; ${totalKm.toFixed(1)} km &nbsp;·&nbsp; <span style="color:#7dd3b0">$${totalTarifa.toFixed(2)}</span>
     </td></tr>`;
 
-    // Filas del mes
-    html += regs.map(r => `<tr>
-      <td style="font-family:'DM Mono',monospace;font-size:11px">${r.fecha}</td>
-      <td><span class="placa">${r.placa||'—'}</span></td>
-      <td style="white-space:nowrap">${cortar(r.conductor,16)}</td>
-      <td style="font-size:11px">${cortar(r.empresa,16)||'—'}</td>
-      <td style="font-size:11px;color:var(--muted)">${cortar(r.origen,18)||'—'} → ${cortar(r.destino,18)||'—'}</td>
-      <td>${(r.km||0).toFixed(2)}</td>
-      <td style="font-weight:600;color:var(--green)">$${(r.tarifa||0).toFixed(2)}</td>
-      <td><span class="tag ${r.tipo==='bóucher'?'tag-blue':r.tipo==='ticket'?'tag-amber':'tag-green'}">${r.tipo||'—'}</span></td>
-      <td style="font-family:'DM Mono',monospace;font-size:11px">${r.voucher||'—'}</td>
-      <td><span class="tag tag-gray">${r.fuente||'manual'}</span></td>
-      <td><button class="btn-danger-sm" onclick="borrarRegistro('${r.id}')">✕</button></td>
-    </tr>`).join('');
+    // Filas del mes, agrupadas por día con subtotal de cada día
+    const porDia = {};
+    regs.forEach(r => { if(!porDia[r.fecha]) porDia[r.fecha] = []; porDia[r.fecha].push(r); });
+    const dias = Object.keys(porDia).sort().reverse();
+    dias.forEach(dia => {
+      const regsDia = porDia[dia];
+      const totalTarifaDia = regsDia.reduce((a,r)=>a+(r.tarifa||0),0);
+      const totalKmDia = regsDia.reduce((a,r)=>a+(r.km||0),0);
+      html += regsDia.map(r => `<tr>
+        <td style="font-family:'DM Mono',monospace;font-size:11px">${r.fecha}</td>
+        <td><span class="placa">${r.placa||'—'}</span></td>
+        <td style="white-space:nowrap">${cortar(r.conductor,16)}</td>
+        <td style="font-size:11px">${cortar(r.empresa,16)||'—'}</td>
+        <td style="font-size:11px;color:var(--muted)">${cortar(r.origen,18)||'—'} → ${cortar(r.destino,18)||'—'}</td>
+        <td>${(r.km||0).toFixed(2)}</td>
+        <td style="font-weight:600;color:var(--green)">$${(r.tarifa||0).toFixed(2)}</td>
+        <td><span class="tag ${r.tipo==='bóucher'?'tag-blue':r.tipo==='ticket'?'tag-amber':'tag-green'}">${r.tipo||'—'}</span></td>
+        <td style="font-family:'DM Mono',monospace;font-size:11px">${r.voucher||'—'}</td>
+        <td><span class="tag tag-gray">${r.fuente||'manual'}</span></td>
+        <td><button class="btn-danger-sm" onclick="borrarRegistro('${r.id}')">✕</button></td>
+      </tr>`).join('');
+      html += `<tr style="background:#f5f5f5;font-size:11px">
+        <td colspan="5" style="text-align:right;padding:4px 10px;color:#666">Total del día ${dia} (${regsDia.length} carreras):</td>
+        <td style="color:#666">${totalKmDia.toFixed(2)}</td>
+        <td style="color:var(--green);font-weight:700">$${totalTarifaDia.toFixed(2)}</td>
+        <td colspan="4"></td>
+      </tr>`;
+    });
 
     // Subtotal del mes
     html += `<tr style="background:#e8f0fa;font-weight:700;font-size:12px">
