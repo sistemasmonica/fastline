@@ -1004,6 +1004,8 @@ function renderResumen() {
 }
 
 // ============ HISTORIAL ============
+const UMBRAL_DIA_BAJO = 30;
+
 function renderHistorial() {
   const MESES = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
   const filtro = document.getElementById('h-filtro-placa').value;
@@ -1058,10 +1060,11 @@ function renderHistorial() {
         <td><span class="tag tag-gray">${r.fuente||'manual'}</span></td>
         <td><button class="btn-danger-sm" onclick="borrarRegistro('${r.id}')">✕</button></td>
       </tr>`).join('');
-      html += `<tr style="background:#f5f5f5;font-size:11px">
-        <td colspan="5" style="text-align:right;padding:4px 10px;color:#666">Total del día ${dia} (${regsDia.length} carreras):</td>
-        <td style="color:#666">${totalKmDia.toFixed(2)}</td>
-        <td style="color:var(--green);font-weight:700">$${totalTarifaDia.toFixed(2)}</td>
+      const diaBajo = totalTarifaDia < UMBRAL_DIA_BAJO;
+      html += `<tr style="background:${diaBajo ? '#fdecea' : '#f5f5f5'};font-size:11px">
+        <td colspan="5" style="text-align:right;padding:4px 10px;color:${diaBajo ? '#c0392b' : '#666'}">${diaBajo ? '⚠️ ' : ''}Total del día ${dia} (${regsDia.length} carreras):</td>
+        <td style="color:${diaBajo ? '#c0392b' : '#666'}">${totalKmDia.toFixed(2)}</td>
+        <td style="color:${diaBajo ? '#c0392b' : 'var(--green)'};font-weight:700">$${totalTarifaDia.toFixed(2)}${diaBajo ? ' — bajo' : ''}</td>
         <td colspan="4" style="padding:4px 8px">
           <input type="text" value="${(notasDia[dia]||'').replace(/"/g,'&quot;')}" placeholder="📝 Nota / recordatorio para este día..." onchange="guardarNotaDia('${dia}', this.value)" style="width:100%;font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:5px;background:#fffbe6">
         </td>
