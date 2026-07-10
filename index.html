@@ -409,12 +409,14 @@ PLACA PFN3446"></textarea>
 <!-- ===== TAB: RESUMEN ===== -->
 <div id="page-resumen" class="page">
   <div class="resumen-filtros">
-    <select id="res-periodo" onchange="renderResumen()">
+    <select id="res-periodo" onchange="cambiarPeriodoResumen()">
       <option value="hoy">Hoy</option>
       <option value="semana">Esta semana</option>
       <option value="mes" selected>Este mes</option>
+      <option value="especifico">Elegir un mes específico...</option>
       <option value="todo">Todo el tiempo</option>
     </select>
+    <input type="month" id="res-mes-especifico" style="display:none" onchange="renderResumen()">
     <select id="res-vehiculo" onchange="renderResumen()">
       <option value="ambos">Ambos vehículos</option>
       <option value="V1">Vehículo 1</option>
@@ -899,7 +901,23 @@ function filtrarPeriodo(arr, periodo) {
     return arr.filter(r => r.fecha >= lunes.toISOString().slice(0,10));
   }
   if(periodo === 'mes') { const mes = hoyStr.slice(0,7); return arr.filter(r => r.fecha.startsWith(mes)); }
+  if(periodo === 'especifico') {
+    const mesEsp = document.getElementById('res-mes-especifico')?.value;
+    return mesEsp ? arr.filter(r => r.fecha.startsWith(mesEsp)) : arr;
+  }
   return arr;
+}
+
+function cambiarPeriodoResumen() {
+  const periodo = document.getElementById('res-periodo').value;
+  const inp = document.getElementById('res-mes-especifico');
+  if(periodo === 'especifico') {
+    inp.style.display = '';
+    if(!inp.value) inp.value = hoy().slice(0,7);
+  } else {
+    inp.style.display = 'none';
+  }
+  renderResumen();
 }
 
 function calcVeh(regs, gasts, veh) {
