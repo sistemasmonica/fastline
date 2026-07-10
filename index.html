@@ -478,6 +478,7 @@ const sb = window.supabase.createClient(SUPA_URL, SUPA_KEY);
 let registros = JSON.parse(localStorage.getItem('fl_registros') || '[]');
 let gastos = JSON.parse(localStorage.getItem('fl_gastos') || '[]');
 let gastoPresets = JSON.parse(localStorage.getItem('fl_gastopresets') || '[]');
+let notasDia = JSON.parse(localStorage.getItem('fl_notasdia') || '{}');
 let previewCarreras = [];
 
 // ============ INIT ============
@@ -502,18 +503,20 @@ function save() {
   localStorage.setItem('fl_registros', JSON.stringify(registros));
   localStorage.setItem('fl_gastos', JSON.stringify(gastos));
   localStorage.setItem('fl_gastopresets', JSON.stringify(gastoPresets));
+  localStorage.setItem('fl_notasdia', JSON.stringify(notasDia));
   saveToCloud();
 }
 
 async function saveToCloud() {
   const ts = new Date().toISOString();
   try {
-    const [r1, r2, r3] = await Promise.all([
+    const [r1, r2, r3, r4] = await Promise.all([
       sb.from('app_data').upsert({ key: 'fl_registros', value: { data: registros }, updated_at: ts }),
       sb.from('app_data').upsert({ key: 'fl_gastos', value: { data: gastos }, updated_at: ts }),
-      sb.from('app_data').upsert({ key: 'fl_gastopresets', value: { data: gastoPresets }, updated_at: ts })
+      sb.from('app_data').upsert({ key: 'fl_gastopresets', value: { data: gastoPresets }, updated_at: ts }),
+      sb.from('app_data').upsert({ key: 'fl_notasdia', value: { data: notasDia }, updated_at: ts })
     ]);
-    if (r1.error || r2.error || r3.error) throw new Error((r1.error && r1.error.message) || (r2.error && r2.error.message) || (r3.error && r3.error.message));
+    if (r1.error || r2.error || r3.error || r4.error) throw new Error((r1.error && r1.error.message) || (r2.error && r2.error.message) || (r3.error && r3.error.message) || (r4.error && r4.error.message));
     setCloudStatus('ok');
   } catch(e) {
     console.warn('Error guardando en nube:', e);
@@ -525,10 +528,11 @@ async function saveToCloud() {
 async function syncFromCloud() {
   setCloudStatus('conectando');
   try {
-    const [r1, r2, r3] = await Promise.all([
+    const [r1, r2, r3, r4] = await Promise.all([
       sb.from('app_data').select('value').eq('key', 'fl_registros').maybeSingle(),
       sb.from('app_data').select('value').eq('key', 'fl_gastos').maybeSingle(),
-      sb.from('app_data').select('value').eq('key', 'fl_gastopresets').maybeSingle()
+      sb.from('app_data').select('value').eq('key', 'fl_gastopresets').maybeSingle(),
+      sb.from('app_data').select('value').eq('key', 'fl_notasdia').maybeSingle()
     ]);
     if (r1.data?.value?.data) {
       registros = r1.data.value.data;
@@ -541,6 +545,10 @@ async function syncFromCloud() {
     if (r3.data?.value?.data) {
       gastoPresets = r3.data.value.data;
       localStorage.setItem('fl_gastopresets', JSON.stringify(gastoPresets));
+    }
+    if (r4.data?.value?.data) {
+      notasDia = r4.data.value.data;
+      localStorage.setItem('fl_notasdia', JSON.stringify(notasDia));
     }
     setCloudStatus('ok');
     renderTodo();
@@ -1054,7 +1062,9 @@ function renderHistorial() {
         <td colspan="5" style="text-align:right;padding:4px 10px;color:#666">Total del día ${dia} (${regsDia.length} carreras):</td>
         <td style="color:#666">${totalKmDia.toFixed(2)}</td>
         <td style="color:var(--green);font-weight:700">$${totalTarifaDia.toFixed(2)}</td>
-        <td colspan="4"></td>
+        <td colspan="4" style="padding:4px 8px">
+          <input type="text" value="${(notasDia[dia]||'').replace(/"/g,'&quot;')}" placeholder="📝 Nota / recordatorio para este día..." onchange="guardarNotaDia('${dia}', this.value)" style="width:100%;font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:5px;background:#fffbe6">
+        </td>
       </tr>`;
     });
 
@@ -1069,6 +1079,14 @@ function renderHistorial() {
 
   html += '</tbody></table>';
   wrap.innerHTML = html;
+}
+
+function guardarNotaDia(dia, texto) {
+  texto = (texto || '').trim();
+  if (texto) notasDia[dia] = texto;
+  else delete notasDia[dia];
+  save();
+  toast(texto ? 'Nota guardada' : 'Nota eliminada', 'green');
 }
 
 function borrarRegistro(id) {
