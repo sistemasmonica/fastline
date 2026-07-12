@@ -143,6 +143,10 @@ tbody tr:hover td { background: var(--surface2); }
 .toast.red { background: var(--red); }
 @keyframes slideIn { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:2000; align-items:center; justify-content:center; padding:1rem; }
+.modal-overlay.open { display:flex; }
+.modal-box { background:var(--surface); border-radius:var(--radius); padding:1.5rem; width:min(520px,92vw); max-height:88vh; overflow-y:auto; box-shadow:var(--shadow); }
+
 /* STATS V1 V2 */
 .veh-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 @media(max-width: 600px) { .veh-grid { grid-template-columns: 1fr; } }
@@ -156,6 +160,46 @@ tbody tr:hover td { background: var(--surface2); }
 <body>
 
 <div class="toast-container" id="toasts"></div>
+
+<div class="modal-overlay" id="modal-carrera-manual">
+  <div class="modal-box">
+    <div class="card-title">➕ Agregar carrera manual</div>
+    <div class="form-grid">
+      <div class="field"><label>Fecha</label><input type="date" id="mc-fecha"></div>
+      <div class="field"><label>Vehículo</label>
+        <select id="mc-placa">
+          <option value="V1 - PFN3446">V1 — PFN3446</option>
+          <option value="V2 - (Placa B)">V2 — (Placa B)</option>
+        </select>
+      </div>
+      <div class="field"><label>Conductor</label><input type="text" id="mc-conductor" placeholder="Nombre del conductor"></div>
+    </div>
+    <div class="form-grid">
+      <div class="field"><label>Empresa</label><input type="text" id="mc-empresa" placeholder="Ej: Banco de la Producción"></div>
+      <div class="field"><label>Usuario / cliente (opcional)</label><input type="text" id="mc-usuario" placeholder="Nombre del pasajero"></div>
+    </div>
+    <div class="form-grid">
+      <div class="field"><label>Hora inicio</label><input type="time" id="mc-hora-ini"></div>
+      <div class="field"><label>Hora fin</label><input type="time" id="mc-hora-fin"></div>
+    </div>
+    <div class="form-grid">
+      <div class="field"><label>Km</label><input type="number" id="mc-km" placeholder="0.0" step="0.1"></div>
+      <div class="field"><label>Tarifa ($)</label><input type="number" id="mc-tarifa" placeholder="0.00" step="0.01"></div>
+      <div class="field"><label>Tipo</label>
+        <select id="mc-tipo">
+          <option value="bóucher">Bóucher / Voucher</option>
+          <option value="efectivo">Efectivo</option>
+          <option value="ticket">Ticket</option>
+        </select>
+      </div>
+    </div>
+    <div class="field"><label>N° de voucher (opcional)</label><input type="text" id="mc-voucher" placeholder="Ej: 123456"></div>
+    <div class="btn-row" style="margin-top:.75rem">
+      <button class="btn btn-primary" onclick="guardarCarreraManual()">💾 Guardar carrera</button>
+      <button class="btn btn-outline" onclick="cerrarModalCarreraManual()">✕ Cancelar</button>
+    </div>
+  </div>
+</div>
 
 <div class="header">
   <div class="header-logo" style="gap:0">
@@ -1061,8 +1105,11 @@ function renderHistorial() {
         <td><button class="btn-danger-sm" onclick="borrarRegistro('${r.id}')">✕</button></td>
       </tr>`).join('');
       const diaBajo = totalTarifaDia < UMBRAL_DIA_BAJO;
+      const placaDia = (regsDia[0]?.placa || '').replace(/'/g,"\\'");
+      const conductorDia = (regsDia[0]?.conductor || '').replace(/'/g,"\\'");
       html += `<tr style="background:${diaBajo ? '#fdecea' : '#f5f5f5'};font-size:11px">
-        <td colspan="5" style="text-align:right;padding:4px 10px;color:${diaBajo ? '#c0392b' : '#666'}">${diaBajo ? '⚠️ ' : ''}Total del día ${dia} (${regsDia.length} carreras):</td>
+        <td colspan="4" style="text-align:right;padding:4px 10px;color:${diaBajo ? '#c0392b' : '#666'}">${diaBajo ? '⚠️ ' : ''}Total del día ${dia} (${regsDia.length} carreras):</td>
+        <td style="padding:4px 6px"><button class="btn-danger-sm" style="border-color:var(--green);color:var(--green)" onclick="abrirModalCarreraManual('${dia}','${placaDia}','${conductorDia}')">➕ Agregar carrera</button></td>
         <td style="color:${diaBajo ? '#c0392b' : '#666'}">${totalKmDia.toFixed(2)}</td>
         <td style="color:${diaBajo ? '#c0392b' : 'var(--green)'};font-weight:700">$${totalTarifaDia.toFixed(2)}${diaBajo ? ' — bajo' : ''}</td>
         <td colspan="4" style="padding:4px 8px">
@@ -1082,6 +1129,47 @@ function renderHistorial() {
 
   html += '</tbody></table>';
   wrap.innerHTML = html;
+}
+
+function abrirModalCarreraManual(fecha, placa, conductor) {
+  document.getElementById('mc-fecha').value = fecha || hoy();
+  document.getElementById('mc-placa').value = placa || 'V1 - PFN3446';
+  document.getElementById('mc-conductor').value = conductor || '';
+  ['mc-empresa','mc-usuario','mc-hora-ini','mc-hora-fin','mc-km','mc-tarifa','mc-voucher'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('mc-tipo').value = 'bóucher';
+  document.getElementById('modal-carrera-manual').classList.add('open');
+}
+
+function cerrarModalCarreraManual() {
+  document.getElementById('modal-carrera-manual').classList.remove('open');
+}
+
+function guardarCarreraManual() {
+  const fecha = document.getElementById('mc-fecha').value;
+  const placa = document.getElementById('mc-placa').value;
+  const tarifa = parseFloat(document.getElementById('mc-tarifa').value) || 0;
+  if (!fecha || !placa) { toast('Completa fecha y vehículo', 'red'); return; }
+  if (!tarifa) { toast('Ingresa la tarifa', 'red'); return; }
+  const horaIni = document.getElementById('mc-hora-ini').value;
+  const horaFin = document.getElementById('mc-hora-fin').value;
+  const vehiculo = placa.startsWith('V1') ? 'V1' : 'V2';
+  registros.push({
+    fecha, placa, vehiculo,
+    conductor: document.getElementById('mc-conductor').value,
+    empresa: document.getElementById('mc-empresa').value,
+    usuario: document.getElementById('mc-usuario').value,
+    origen: horaIni ? ('HORA: ' + horaIni) : '',
+    destino: horaFin ? ('HORA: ' + horaFin) : '',
+    km: parseFloat(document.getElementById('mc-km').value) || 0,
+    tarifa,
+    tipo: document.getElementById('mc-tipo').value,
+    voucher: document.getElementById('mc-voucher').value,
+    fuente: 'manual', id: Date.now()+Math.random()
+  });
+  save();
+  cerrarModalCarreraManual();
+  renderHistorial();
+  toast('Carrera agregada', 'green');
 }
 
 function guardarNotaDia(dia, texto) {
