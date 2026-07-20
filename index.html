@@ -187,7 +187,8 @@ tbody tr:hover td { background: var(--surface2); }
       <div class="field"><label>Tarifa ($)</label><input type="number" id="mc-tarifa" placeholder="0.00" step="0.01"></div>
       <div class="field"><label>Tipo</label>
         <select id="mc-tipo">
-          <option value="bóucher">Bóucher / Voucher</option>
+          <option value="corporativo">Corporativo (bóucher físico)</option>
+          <option value="bóucher">Bóucher electrónico</option>
           <option value="efectivo">Efectivo</option>
           <option value="ticket">Ticket</option>
         </select>
@@ -1160,7 +1161,7 @@ function abrirModalCarreraManual(fecha, placa, conductor) {
   document.getElementById('mc-placa').value = placa || 'V1 - PFN3446';
   document.getElementById('mc-conductor').value = conductor || '';
   ['mc-empresa','mc-usuario','mc-hora-ini','mc-hora-fin','mc-km','mc-tarifa','mc-voucher'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('mc-tipo').value = 'bóucher';
+  document.getElementById('mc-tipo').value = 'corporativo';
   document.getElementById('modal-carrera-manual').classList.add('open');
 }
 
