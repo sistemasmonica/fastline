@@ -990,13 +990,17 @@ function cambiarPeriodoResumen() {
   renderResumen();
 }
 
+const COMISION_EMPRESA_PCT = 0.145;
+const COMISION_EMPRESA_MIN = 12;
+
 function calcVeh(regs, gasts, veh) {
   const r = veh === 'ambos' ? regs : regs.filter(x => (x.vehiculo||'').startsWith(veh) || (x.placa||'').startsWith(veh));
   const g = veh === 'ambos' ? gasts : gasts.filter(x => x.placa.includes(veh) || x.placa === 'Ambos');
   const ingresos = r.reduce((s,x) => s + (x.tarifa||0), 0);
   const totalGastos = g.reduce((s,x) => s + x.monto, 0);
   const km = r.reduce((s,x) => s + (x.km||0), 0);
-  return { ingresos, totalGastos, neto: ingresos - totalGastos, km, n: r.length };
+  const comisionEmpresa = r.reduce((s,x) => s + ((x.tarifa||0) >= COMISION_EMPRESA_MIN ? (x.tarifa||0) * COMISION_EMPRESA_PCT : 0), 0);
+  return { ingresos, totalGastos, neto: ingresos - totalGastos, km, n: r.length, comisionEmpresa };
 }
 
 function renderResumen() {
@@ -1013,6 +1017,7 @@ function renderResumen() {
     <div class="metric"><div class="metric-label">Km totales</div><div class="metric-val blue">${s.km.toFixed(1)}</div><div class="metric-sub">kilómetros</div></div>
     <div class="metric"><div class="metric-label">Carreras / registros</div><div class="metric-val">${s.n}</div></div>
     <div class="metric"><div class="metric-label">Promedio por carrera</div><div class="metric-val">$${s.n?(s.ingresos/s.n).toFixed(2):'0.00'}</div></div>
+    <div class="metric"><div class="metric-label">Se queda la empresa (QSO 14.5%)</div><div class="metric-val red">$${s.comisionEmpresa.toFixed(2)}</div><div class="metric-sub">carreras de $12 o más</div></div>
   `;
 
   function statBox(veh2) {
@@ -1020,6 +1025,7 @@ function renderResumen() {
     return `
       <div class="stat-row"><span class="stat-label">Ingresos</span><span style="color:var(--green);font-weight:500">$${sv.ingresos.toFixed(2)}</span></div>
       <div class="stat-row"><span class="stat-label">Gastos</span><span style="color:var(--red)">-$${sv.totalGastos.toFixed(2)}</span></div>
+      <div class="stat-row"><span class="stat-label">Se queda la empresa</span><span style="color:var(--red)">-$${sv.comisionEmpresa.toFixed(2)}</span></div>
       <div class="stat-row"><span class="stat-label">Km</span><span>${sv.km.toFixed(1)} km</span></div>
       <div class="stat-row"><span class="stat-label">Carreras</span><span>${sv.n}</span></div>
       <div class="stat-row"><span class="stat-label">Neto</span><span style="color:${sv.neto>=0?'var(--green)':'var(--red)'};font-weight:600">$${sv.neto.toFixed(2)}</span></div>
