@@ -1336,6 +1336,11 @@ async function pegarCorreoPortapapeles() {
 const MSAL_CLIENT_ID = 'a6899a29-bb17-474a-892a-fa6ce3f0e4bb';
 let msalApp = null;
 let msalAccount = null;
+// En el celular (o con el ícono instalado) las ventanitas emergentes se bloquean:
+// ahí se inicia sesión en la misma pestaña (redirect) y Microsoft la devuelve aquí.
+const MSAL_MOVIL = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
+  (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+const MSAL_SCOPES = { scopes: ['Mail.Read'] };
 
 function initMsal() {
   if (MSAL_CLIENT_ID === 'PENDIENTE') return;
@@ -1347,11 +1352,17 @@ function initMsal() {
     },
     cache: { cacheLocation: 'localStorage' }
   });
-  const cuentas = msalApp.getAllAccounts();
-  if (cuentas.length > 0) {
-    msalAccount = cuentas[0];
-    setHmEstado('conectado', msalAccount.username);
-  }
+  // Si volvemos de iniciar sesión en Microsoft (celular), recoger la cuenta
+  msalApp.handleRedirectPromise().then(resp => {
+    if (resp && resp.account) {
+      msalAccount = resp.account;
+      toast('Conectado a ' + msalAccount.username, 'green');
+    } else {
+      const cuentas = msalApp.getAllAccounts();
+      if (cuentas.length > 0) msalAccount = cuentas[0];
+    }
+    if (msalAccount) setHmEstado('conectado', msalAccount.username);
+  }).catch(e => toast('Error al conectar: ' + e.message, 'red'));
 }
 
 async function conectarHotmail() {
@@ -1360,7 +1371,8 @@ async function conectarHotmail() {
     return;
   }
   try {
-    const resp = await msalApp.loginPopup({ scopes: ['Mail.Read'] });
+    if (MSAL_MOVIL) { await msalApp.loginRedirect(MSAL_SCOPES); return; }
+    const resp = await msalApp.loginPopup(MSAL_SCOPES);
     msalAccount = resp.account;
     setHmEstado('conectado', msalAccount.username);
     toast('Conectado a ' + msalAccount.username, 'green');
@@ -1378,7 +1390,14 @@ async function importarCorreosHotmail() {
 
   setHmEstado('cargando', '');
   try {
-    const token = await msalApp.acquireTokenSilent({ scopes: ['Mail.Read'], account: msalAccount });
+    let token;
+    try {
+      token = await msalApp.acquireTokenSilent({ ...MSAL_SCOPES, account: msalAccount });
+    } catch (eTok) {
+      // El permiso venció: pedirlo otra vez (en el celular, en la misma pestaña)
+      if (MSAL_MOVIL) { await msalApp.acquireTokenRedirect({ ...MSAL_SCOPES, account: msalAccount }); return; }
+      token = await msalApp.acquireTokenPopup({ ...MSAL_SCOPES, account: msalAccount });
+    }
     // Se usa $filter por fecha (en vez de $search) porque la búsqueda de texto de Graph
     // no es confiable para cuentas personales de Hotmail/Outlook — a veces no encuentra
     // correos que sí existen. Filtramos por texto nosotros mismos, del lado del cliente.
@@ -1421,7 +1440,10 @@ async function importarCorreosHotmail() {
 }
 
 function desconectarHotmail() {
-  if (msalApp && msalAccount) msalApp.logoutPopup({ account: msalAccount });
+  if (msalApp && msalAccount) {
+    if (MSAL_MOVIL) msalApp.logoutRedirect({ account: msalAccount });
+    else msalApp.logoutPopup({ account: msalAccount });
+  }
   msalAccount = null;
   setHmEstado('desconectado', '');
 }
